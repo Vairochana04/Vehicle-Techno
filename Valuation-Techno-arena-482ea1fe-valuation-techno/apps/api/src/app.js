@@ -22,7 +22,17 @@ app.use('/uploads', express.static(config.uploadDir));
 app.get('/api/health', (req, res) => res.json({ ok: true, service: 'Valuation Techno API', time: new Date().toISOString() }));
 app.use('/api/auth', authRoutes); app.use('/api/jobs', jobRoutes); app.use('/api/admin', adminRoutes); app.use('/api/verify', verifyRoutes); app.use('/api', analyticsRoutes);
 // Mobile App Layer: file upload with geo/time metadata + content hash for killfake duplicate checks
-const upload = multer({ dest: config.uploadDir, limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: config.uploadDir,
+    filename: (req, file, cb) => {
+      const originalExt = path.extname(file.originalname || '').toLowerCase();
+      const ext = /^\.[a-z0-9]{1,8}$/.test(originalExt) ? originalExt : '';
+      cb(null, `${crypto.randomUUID()}${ext}`);
+    },
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
 app.post('/api/upload', requireAuth, requireRole('INSPECTOR', 'BANK'), upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded (field name: file)' });
   const hash = crypto.createHash('sha256').update(fs.readFileSync(req.file.path)).digest('hex');

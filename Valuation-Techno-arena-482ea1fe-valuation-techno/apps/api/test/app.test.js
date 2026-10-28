@@ -8,6 +8,7 @@ process.env.JWT_SECRET = 'test-secret';
 const { default: app } = await import('../src/app.js');
 const { variancePct, isGreen } = await import('../src/utils.js');
 const { deepSearchMarketValue, analyzeDamage, computePlatformScore, verifyVehicle } = await import('../src/services/providers.js');
+const { mediaBaseUrl } = await import('../src/routes/jobs.js');
 
 const expect=(v)=>({toBe:(e)=>assert.equal(v,e),toBeCloseTo:(e,p=2)=>assert.ok(Math.abs(v-e)<10**(-p),`${v} !~ ${e}`),toContain:(e)=>assert.ok(String(v).includes(e),`${v} missing ${e}`),not:{toContain:(e)=>assert.ok(!String(v).includes(e))},toBeGreaterThanOrEqual:(e)=>assert.ok(v>=e),toBeTruthy:()=>assert.ok(v)});
 const creds = { bank: ['bank@valuation.techno', 'Bank@123'], inspector: ['inspector@valuation.techno', 'Inspector@123'], inspector2: ['inspector2@valuation.techno', 'Inspector@123'], far: ['inspector3@valuation.techno', 'Inspector@123'], seeker: ['seeker@valuation.techno', 'Seeker@123'], admin: ['admin@valuation.techno', 'Admin@123'] };
@@ -26,6 +27,13 @@ async function createJob(reg = 'TN38AB1234', over = {}) {
   expect(r.status).toBe(201); return r.body;
 }
 
+describe('report and QR public URL handling', () => {
+  it('uses the public forwarded origin for scanner links behind a preview proxy', () => {
+    const headers = { 'x-forwarded-proto': 'https, http', 'x-forwarded-host': 'valuation.example.test, internal:4000', host: 'internal:4000' };
+    const req = { protocol: 'http', get: (name) => headers[name] };
+    expect(mediaBaseUrl(req)).toBe('https://valuation.example.test');
+  });
+});
 describe('unit: variance & rating math (case-study rules)', () => {
   it('variance 5% boundary: <=5 green, >5 red', () => { expect(variancePct(105, 100)).toBe(5); expect(isGreen(5)).toBe(true); expect(isGreen(5.01)).toBe(false); expect(variancePct(700000, 738500)).toBe(5.21); });
   it('vehicle verification rejects bad plate, passes Indian plate', () => { expect(verifyVehicle({ regNumber: '1234' }).verified).toBe(false); expect(verifyVehicle({ regNumber: 'TN38AB1234' }).verified).toBe(true); });
@@ -75,6 +83,16 @@ describe('Phases 2-6: GREEN path end-to-end', () => {
     const settled = await request(app).post(`/api/jobs/${job.id}/settle`).set(auth(T.bank)); expect(settled.body.status).toBe('SETTLED');
     expect(settled.body.ledger.filter((l) => l.type === 'PLATFORM_COMMISSION')[0].amount).toBe(500); // 20% of 2500
     expect((await request(app).post(`/api/jobs/${job.id}/settle`).set(auth(T.bank))).status).toBe(409);
+    const settledReport = await request(app).get(`/api/jobs/${job.id}/report`).set(auth(T.seeker));
+    expect(settledReport.status).toBe(200); expect(settledReport.headers['content-type']).toContain('text/html'); expect(settledReport.text).toContain('Vehicle Valuation Summary');
+    const settledQr = await request(app).get(`/api/jobs/${job.id}/qr`).set(auth(T.seeker));
+    expect(settledQr.status).toBe(200); expect(settledQr.headers['content-type']).toContain('image/png');
+    const seekerDetail = await request(app).get(`/api/jobs/${job.id}`).set(auth(T.seeker));
+    expect(settledReport.text).toContain('Scan to verify report'); expect(settledReport.text).toContain(seekerDetail.body.verifyCode); expect(settledReport.text).toContain('data:image/png;base64,'); expect(settledReport.text).toContain('VALUATION APPROVED'); expect(settledReport.text).toContain('The bank makes the final loan decision separately.'); expect(settledReport.text).not.toContain('class="summary-photo"');
+    const settledPdf = await request(app).get(`/api/jobs/${job.id}/report.pdf`).set(auth(T.seeker));
+    expect(settledPdf.status).toBe(200); expect(settledPdf.headers['content-type']).toContain('application/pdf');
+    const publicVerify = await request(app).get(`/api/verify/${seekerDetail.body.verifyCode}`);
+    expect(publicVerify.status).toBe(200); expect(publicVerify.body.authentic).toBe(true); expect(publicVerify.body.status).toBe('SETTLED');
   });
 });
 describe('Phase 3/4: fraud + RED path with audit', () => {

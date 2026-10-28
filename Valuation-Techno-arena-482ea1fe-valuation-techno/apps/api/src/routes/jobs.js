@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import fs from 'node:fs';
+import path from 'node:path';
 import PDFDocument from 'pdfkit';
 import { db, settings, audit, notify, addLedger, parseJob } from '../db.js';
 import { config } from '../config.js';
@@ -20,6 +22,27 @@ function eligibleInspectors(job) {
     .map((u) => ({ ...u, distanceKm: haversineKm(u.lat, u.lng, job.vehicleLat, job.vehicleLng) }))
     .filter((u) => u.distanceKm <= Number(job.broadcastRadiusKm)).sort((a, b) => b.rating - a.rating || a.distanceKm - b.distanceKm);
 }
+function canAccessJob(job, user) {
+  if (!job || !user) return false;
+  if (user.role === 'ADMIN') return true;
+  if (user.role === 'BANK') return job.bankId === user.id;
+  if (user.role === 'LOAN_SEEKER') return (job.seekerEmail && job.seekerEmail.toLowerCase() === String(user.email || '').toLowerCase()) || (job.seekerPhone && job.seekerPhone === user.phone);
+  if (user.role === 'INSPECTOR') return job.assignedInspectorId === user.id || (job.status === 'BROADCAST' && eligibleInspectors(job).some((inspector) => inspector.id === user.id));
+  return false;
+}
+function ensureJobAccess(job, user, res) {
+  if (canAccessJob(job, user)) return true;
+  res.status(404).json({ error: 'Job not found' });
+  return false;
+}
+export const mediaBaseUrl = (req) => {
+  const configured = process.env.PUBLIC_BASE_URL;
+  if (configured) return configured.replace(/\/+$/, '');
+  const first = (value) => String(value || '').split(',')[0].trim();
+  const proto = first(req.get('x-forwarded-proto') || req.protocol).replace(/:$/, '');
+  const host = first(req.get('x-forwarded-host') || req.get('host'));
+  return `${proto}://${host}`;
+};
 function detail(job) {
   return { ...parseJob(job), inspection: getInspection(job.id), analysis: getAnalysis(job.id), valuation: getValuation(job.id),
     assignedInspector: job.assignedInspectorId ? db.prepare('SELECT id,name,email,phone,rating,ratingCount,status FROM users WHERE id=?').get(job.assignedInspectorId) : null,
@@ -30,6 +53,10 @@ function detail(job) {
     inspectorLocation: job.inspectorLat != null ? { lat: job.inspectorLat, lng: job.inspectorLng, updatedAt: job.locationUpdatedAt } : null,
     ledger: db.prepare('SELECT * FROM ledger WHERE jobId=? ORDER BY createdAt').all(job.id) };
 }
+const seekerView = (jobDetail) => ({ ...jobDetail, bankId: undefined, assignedInspectorId: undefined, allocationMode: undefined, priorityUntil: undefined,
+  verification: undefined, inspection: undefined, analysis: undefined, eligibleInspectors: undefined, ledger: undefined, bankFeedback: undefined,
+  assignedInspector: jobDetail.assignedInspector ? { id: jobDetail.assignedInspector.id, name: jobDetail.assignedInspector.name, rating: jobDetail.assignedInspector.rating, status: jobDetail.assignedInspector.status } : null,
+  valuation: jobDetail.valuation && ({ flag: jobDetail.valuation.flag, finalValuation: jobDetail.valuation.finalValuation, variancePct: jobDetail.valuation.variancePct, status: jobDetail.valuation.status }) });
 export function runPipeline(jobRow, actorId) {
   const job = parseJob(jobRow); const inspection = getInspection(job.id); if (!inspection) throw Object.assign(new Error('Inspection not submitted'), { status: 400 });
   const damage = analyzeDamage(job, inspection); const fraud = analyzeFraud(job, inspection);
@@ -71,12 +98,12 @@ r.post('/', requireRole('BANK'), wrap(async (req, res) => {
 r.get('/', wrap(async (req, res) => {
   let jobs;
   if (req.user.role === 'BANK') jobs = db.prepare('SELECT * FROM jobs WHERE bankId=? ORDER BY createdAt DESC').all(req.user.id);
-  else if (req.user.role === 'INSPECTOR') jobs = db.prepare('SELECT * FROM jobs WHERE assignedInspectorId=? OR status=\'BROADCAST\' ORDER BY createdAt DESC').all(req.user.id);
+  else if (req.user.role === 'INSPECTOR') jobs = db.prepare('SELECT * FROM jobs WHERE assignedInspectorId=? OR status=\'BROADCAST\' ORDER BY createdAt DESC').all(req.user.id).filter((job) => job.assignedInspectorId === req.user.id || eligibleInspectors(job).some((inspector) => inspector.id === req.user.id));
   else if (req.user.role === 'LOAN_SEEKER') jobs = db.prepare('SELECT * FROM jobs WHERE seekerEmail=? OR seekerPhone=? ORDER BY createdAt DESC').all(req.user.email, req.user.phone);
   else jobs = db.prepare('SELECT * FROM jobs ORDER BY createdAt DESC').all();
-  res.json(jobs.map((j) => { const d = detail(j); return req.user.role === 'LOAN_SEEKER' ? { ...d, valuation: d.valuation && ({ flag: d.valuation.flag, finalValuation: d.valuation.finalValuation, variancePct: d.valuation.variancePct, status: d.valuation.status }), analysis: undefined, ledger: undefined } : d; }));
+  res.json(jobs.map((job) => { const result = detail(job); return req.user.role === 'LOAN_SEEKER' ? seekerView(result) : result; }));
 }));
-r.get('/:id', wrap(async (req, res) => { const j = getJob(req.params.id); if (!j) return res.status(404).json({ error: 'Job not found' }); res.json(detail(j)); }));
+r.get('/:id', wrap(async (req, res) => { const job = getJob(req.params.id); if (!ensureJobAccess(job, req.user, res)) return; const result = detail(job); res.json(req.user.role === 'LOAN_SEEKER' ? seekerView(result) : result); }));
 
 // Phase 1 — Exclusive assignment (atomic: only a BROADCAST job can be claimed)
 r.post('/:id/accept', requireRole('INSPECTOR'), wrap(async (req, res) => {
@@ -120,7 +147,7 @@ r.post('/:id/inspection', requireRole('INSPECTOR'), wrap(async (req, res) => {
   publish({ type: 'VALUATION_READY', jobId: job.id, regNumber: job.regNumber, flag: valuation.flag, variancePct: valuation.variancePct, roles: ['BANK', 'ADMIN', 'INSPECTOR', 'LOAN_SEEKER'] });
   res.status(201).json({ ...detail(getJob(job.id)), valuation });
 }));
-r.post('/:id/analyze', requireRole('ADMIN', 'BANK'), wrap(async (req, res) => { const job = getJob(req.params.id); if (!job) return res.status(404).json({ error: 'Job not found' }); res.json({ valuation: runPipeline(job, req.user.id), ...detail(getJob(job.id)) }); }));
+r.post('/:id/analyze', requireRole('ADMIN', 'BANK'), wrap(async (req, res) => { const job = getJob(req.params.id); if (!ensureJobAccess(job, req.user, res)) return; res.json({ valuation: runPipeline(job, req.user.id), ...detail(getJob(job.id)) }); }));
 
 // Phase 4 — Audit for RED flags
 r.post('/:id/audit', requireRole('ADMIN'), wrap(async (req, res) => {
@@ -171,41 +198,117 @@ r.post('/:id/messages', wrap(async (req, res) => {
   res.status(201).json(msg);
 }));
 
-// QR code image (PNG) for this job's public report-verification page —
-// used directly inside the app (job details) as well as on printed reports.
+// QR image for a delivered report. The image is only available to users who can access this job.
 r.get('/:id/qr', wrap(async (req, res) => {
-  const job = getJob(req.params.id); if (!job) return res.status(404).json({ error: 'Job not found' });
+  const job = getJob(req.params.id); if (!ensureJobAccess(job, req.user, res)) return;
   const v = getValuation(job.id); if (!v?.finalValuation) return res.status(409).json({ error: 'Report not ready yet' });
-  const url = `${req.protocol}://${req.get('host')}/verify/${verifyCodeFor(job.id)}`;
-  const buf = await QRCode.toBuffer(url, { width: 220, margin: 1 });
+  const url = `${mediaBaseUrl(req)}/verify/${verifyCodeFor(job.id)}`;
+  const buf = await QRCode.toBuffer(url, { width: 320, margin: 2, errorCorrectionLevel: 'M' });
   res.setHeader('Content-Type', 'image/png'); res.send(buf);
 }));
 
-// Phase 5 — Reports (seeker can only see summary; enforced server-side)
+// Phase 5 — Full report for the owning bank/admin/assigned inspector; summary for the linked seeker.
 r.get('/:id/report', wrap(async (req, res) => {
-  const jobRow = getJob(req.params.id); if (!jobRow) return res.status(404).json({ error: 'Job not found' });
+  const jobRow = getJob(req.params.id); if (!ensureJobAccess(jobRow, req.user, res)) return;
   const job = parseJob(jobRow); const valuation = getValuation(job.id); if (!valuation || !valuation.finalValuation) return res.status(409).json({ error: 'Final valuation not ready (audit may be pending)' });
   const variant = req.user.role === 'LOAN_SEEKER' ? 'summary' : (req.query.variant === 'summary' ? 'summary' : 'full');
-  let verify = null;
-  if (variant === 'full') { const code = verifyCodeFor(job.id); const url = `${req.protocol}://${req.get('host')}/verify/${code}`; let qrDataUrl = null; try { qrDataUrl = await QRCode.toDataURL(url, { width: 160, margin: 1 }); } catch { /* QR optional */ } verify = { code, url, qrDataUrl }; }
-  const data = { job, inspection: getInspection(job.id), analysis: getAnalysis(job.id), valuation, verify };
+  const code = verifyCodeFor(job.id); const url = `${mediaBaseUrl(req)}/verify/${code}`;
+  let qrDataUrl = null; try { qrDataUrl = await QRCode.toDataURL(url, { width: 320, margin: 2, errorCorrectionLevel: 'M' }); } catch { /* QR optional; verification link remains available */ }
+  const verify = { code, url, qrDataUrl };
+  const data = { job, inspection: getInspection(job.id), analysis: getAnalysis(job.id), valuation, verify, mediaBaseUrl: mediaBaseUrl(req) };
   res.type('html').send(variant === 'summary' ? summaryReportHtml(data) : fullReportHtml(data));
 }));
 r.get('/:id/report.pdf', wrap(async (req, res) => {
-  const jobRow = getJob(req.params.id); if (!jobRow) return res.status(404).json({ error: 'Job not found' });
-  const job = parseJob(jobRow); const v = getValuation(job.id); if (!v?.finalValuation) return res.status(409).json({ error: 'Final valuation not ready' });
+  const jobRow = getJob(req.params.id); if (!ensureJobAccess(jobRow, req.user, res)) return;
+  const job = parseJob(jobRow); const valuation = getValuation(job.id); if (!valuation?.finalValuation) return res.status(409).json({ error: 'Final valuation not ready' });
   const variant = req.user.role === 'LOAN_SEEKER' ? 'summary' : (req.query.variant === 'summary' ? 'summary' : 'full');
-  const doc = new PDFDocument(); res.setHeader('Content-Type', 'application/pdf'); res.setHeader('Content-Disposition', `attachment; filename="valuation-${job.regNumber}-${variant}.pdf"`); doc.pipe(res);
-  doc.fontSize(18).text('Valuation Techno — Valuation Report'); doc.moveDown().fontSize(12).text(`${job.make} ${job.model} (${job.year}) · ${job.regNumber}`).text(`Final Valuation: INR ${v.finalValuation}`).text(`Flag: ${v.flag} · Variance: ${v.variancePct}%`);
-  if (variant === 'full') { doc.text(`AI Valuation: INR ${v.aiValuation} · Manual: INR ${v.manualValuation} · Market: INR ${v.marketValue}`); const a = getAnalysis(job.id); if (a) doc.text(`Damage total: INR ${a.damage.costBreakdown.totalDamageCost} · Fraud: ${a.fraud.riskLevel} (${a.fraud.fraudScore}/100)`); }
-  if (variant === 'full') { try { const code = verifyCodeFor(job.id); const url = `${req.protocol}://${req.get('host')}/verify/${code}`; const buf = await QRCode.toBuffer(url, { width: 140, margin: 1 }); doc.moveDown().fontSize(13).text('Verify This Report'); doc.image(buf, { width: 110 }); doc.fontSize(10).text(`Verification Code: ${code}`).text(url); } catch { /* QR optional */ } }
-  doc.text('Generated by Valuation Techno · Smart Valuation. Safer Transactions.'); doc.end();
+  const inspection = getInspection(job.id); const analysis = getAnalysis(job.id);
+  const doc = new PDFDocument({ margin: 44, size: 'A4' });
+  res.setHeader('Content-Type', 'application/pdf'); res.setHeader('Content-Disposition', `attachment; filename="valuation-${job.regNumber}-${variant}.pdf"`); doc.pipe(res);
+  const section = (title) => { if (doc.y > 690) doc.addPage(); doc.moveDown(0.7).fontSize(14).fillColor('#163c5a').text(title); doc.moveDown(0.25).fillColor('#18314a').fontSize(10); };
+  doc.fontSize(22).fillColor('#163c5a').text('Valuation Techno'); doc.moveDown(0.2).fontSize(16).text(variant === 'summary' ? 'Vehicle valuation summary' : 'Full vehicle valuation report');
+  doc.moveDown().fontSize(11).fillColor('#18314a').text(`${job.make} ${job.model} ${job.variant || ''} (${job.year}) · ${job.regNumber}`)
+    .text(`Loan reference: ${job.loanRef || '—'} · Owner: ${job.seekerName || '—'} · City: ${job.city || '—'}`)
+    .text(`Final valuation: INR ${valuation.finalValuation} · Flag: ${valuation.flag} · Variance: ${valuation.variancePct}%`);
+  if (variant === 'summary') {
+    doc.moveDown().text('Inspection status: Inspection completed');
+    doc.moveDown().text('This is the vehicle valuation summary. The bank will make the final loan decision separately.');
+    const code = verifyCodeFor(job.id); const url = `${mediaBaseUrl(req)}/verify/${code}`;
+    doc.moveDown().fontSize(12).fillColor('#163c5a').text('Scan to verify report');
+    try { const qr = await QRCode.toBuffer(url, { width: 320, margin: 2, errorCorrectionLevel: 'M' }); doc.image(qr, { width: 112 }); }
+    catch { /* the verification link remains available if QR generation fails */ }
+    doc.moveDown(0.3).fontSize(9).fillColor('#18314a').text(`Verification code: ${code}`);
+    doc.fillColor('#2563eb').text('Open public verification page', { link: url, underline: true });
+    doc.moveDown().fillColor('#61758a').text(`Generated ${new Date().toLocaleString('en-IN')} · Valuation Techno`);
+    doc.end(); return;
+  }
+
+  section('Vehicle details and registry verification');
+  doc.text(`Fuel: ${job.fuel || '—'} · Transmission: ${job.transmission || '—'} · Location: ${job.address || '—'}, ${job.city || '—'} ${job.pincode || ''}`)
+    .text(`Expected odometer: ${job.expectedOdometer ?? '—'} km · Owners: ${job.verification?.ownership?.ownersCount ?? job.verification?.ownership?.owners ?? '—'}`)
+    .text(`Accidents: ${job.verification?.history?.accidentCount ?? job.verification?.history?.accidents ?? '—'} · Claims: ${job.verification?.history?.claimCount ?? job.verification?.history?.claims ?? '—'} · Insurance valid: ${job.verification?.insurance?.valid ? 'Yes' : 'No'}`);
+  for (const check of job.verification?.checks || []) doc.text(`${check.name}: ${check.status} — ${check.detail}`);
+
+  section('Dual valuation and variance');
+  doc.text(`Market estimate: INR ${valuation.marketValue} · System estimate: INR ${valuation.aiValuation} · Inspector valuation: INR ${valuation.manualValuation}`)
+    .text(`Reasons: ${(valuation.varianceReasons || []).join('; ') || '—'}`);
+
+  section('Inspector condition and notes');
+  const condition = inspection?.condition || {};
+  doc.text(`Engine: ${condition.engine ?? '—'}/5 · Body: ${condition.body ?? '—'}/5 · Tyres: ${condition.tires ?? '—'}/5 · Interior: ${condition.interior ?? '—'}/5`)
+    .text(`Odometer reading: ${inspection?.odometerReading ?? '—'} km · Chassis: ${inspection?.chassisNumber || '—'}`)
+    .text(`Manual repair estimate: INR ${inspection?.manualRepairEstimate ?? 0} · Notes: ${inspection?.notes || '—'}`);
+
+  section('AI damage estimate and cost breakdown');
+  if (analysis) {
+    doc.text(`Damage total: INR ${analysis.damage.costBreakdown.totalDamageCost} · Parts: INR ${analysis.damage.costBreakdown.parts} · Labour: INR ${analysis.damage.costBreakdown.labor} · Paint: INR ${analysis.damage.costBreakdown.paint} · Tyre wear: ${analysis.damage.tireWearPct}%`);
+    for (const item of analysis.damage.detections || []) doc.text(`• ${item.part}: ${item.type}, ${item.severity}, ${Math.round((item.confidence || 0) * 100)}% confidence — INR ${item.estimatedCost}`);
+    if (!(analysis.damage.detections || []).length) doc.text('No system damage annotations recorded.');
+    doc.moveDown(0.4).text('Inspector-recorded damage:');
+    for (const item of inspection?.damages || []) doc.text(`• ${item.part}: ${item.type}, ${item.severity} — ${item.description || 'No description'} · repair INR ${item.repairEstimate ?? 0}`);
+  } else doc.text('No automated damage analysis available.');
+
+  section('Fraud risk assessment');
+  if (analysis) {
+    doc.text(`Risk: ${analysis.fraud.riskLevel} · Score: ${analysis.fraud.fraudScore}/100`);
+    for (const check of analysis.fraud.checks || []) doc.text(`${check.name}: ${check.status} — ${check.detail}`);
+  } else doc.text('No fraud checks recorded.');
+
+  section('Inspection photos and location evidence');
+  const photos = (inspection?.images || []).filter((image) => image.filename);
+  if (!photos.length) doc.text('No uploaded photo files are attached; metadata-only inspection records may be present.');
+  for (const image of photos) {
+    if (doc.y > 600) doc.addPage();
+    doc.moveDown(0.3).fontSize(10).text(`${image.category} · ${image.originalName || image.filename} · ${image.capturedAt || 'time not recorded'} · GPS ${image.lat ?? '—'}, ${image.lng ?? '—'}`);
+    const imagePath = path.join(config.uploadDir, path.basename(image.filename));
+    const ext = path.extname(image.originalName || image.filename).toLowerCase();
+    if (fs.existsSync(imagePath) && ['.jpg', '.jpeg', '.png'].includes(ext)) {
+      try { doc.image(imagePath, { fit: [430, 240], align: 'center' }).moveDown(0.4); }
+      catch { doc.fontSize(9).fillColor('#64748b').text('Photo file could not be embedded in the PDF.'); }
+    } else doc.fontSize(9).fillColor('#64748b').text('Photo preview is unavailable in PDF; evidence metadata is recorded above.');
+    if (doc.y > 690) doc.addPage();
+  }
+
+  section('Vehicle documents');
+  const documents = inspection?.documents || [];
+  if (!documents.length) doc.text('No documents uploaded.');
+  for (const document of documents) doc.text(`${document.type}: ${document.originalName || document.filename || 'No file attached'}`);
+
+  section('Report verification');
+  const code = verifyCodeFor(job.id); const url = `${mediaBaseUrl(req)}/verify/${code}`;
+  try { const qr = await QRCode.toBuffer(url, { width: 120, margin: 1 }); doc.image(qr, { width: 92 }); }
+  catch { /* QR is supplementary; verification code remains available */ }
+  doc.moveDown(0.3).fontSize(9).text(`Verification code: ${code} · ${url}`);
+  doc.moveDown().fontSize(8).fillColor('#8a5d12').text('Provider notice: registry, market pricing, image analysis and fraud scoring are simulated in this preview; live vendor services are not connected.');
+  doc.moveDown().fillColor('#61758a').text(`Generated ${new Date().toLocaleString('en-IN')} · Valuation Techno`);
+  doc.end();
 }));
 
 // Phase 5 — Rating: Final = 0.4 seeker + 0.6 platform
 r.post('/:id/rate', requireRole('LOAN_SEEKER', 'BANK'), wrap(async (req, res) => {
   const b = z.object({ professionalism: z.number().min(1).max(5), punctuality: z.number().min(1).max(5), communication: z.number().min(1).max(5), thoroughness: z.number().min(1).max(5), feedback: z.string().optional() }).parse(req.body);
   const job = getJob(req.params.id); if (!job?.assignedInspectorId) return res.status(409).json({ error: 'No inspector assigned' });
+  if (!ensureJobAccess(job, req.user, res)) return;
   if (!['REPORT_DELIVERED', 'SETTLED'].includes(job.status)) return res.status(409).json({ error: 'Rating opens after report delivery' });
   if (db.prepare('SELECT id FROM ratings WHERE jobId=?').get(job.id)) return res.status(409).json({ error: 'Already rated' });
   const v = getValuation(job.id); const a = getAnalysis(job.id); const insp = getInspection(job.id);
@@ -240,6 +343,7 @@ r.post('/:id/bank-feedback', requireRole('BANK'), wrap(async (req, res) => {
 // Phase 6 — Settlement (idempotent; only after report delivery)
 r.post('/:id/settle', requireRole('BANK', 'ADMIN'), wrap(async (req, res) => {
   const job = getJob(req.params.id); if (!job) return res.status(404).json({ error: 'Job not found' });
+  if (req.user.role === 'BANK' && job.bankId !== req.user.id) return res.status(404).json({ error: 'Job not found' });
   if (job.status === 'SETTLED') return res.status(409).json({ error: 'Already settled' });
   if (job.status !== 'REPORT_DELIVERED') return res.status(409).json({ error: `Settlement requires REPORT_DELIVERED, found ${job.status}` });
   const fee = Number(job.valuationFee); const commission = round2(fee * config.platformCommissionPct / 100);
