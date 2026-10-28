@@ -1,0 +1,14 @@
+{
+  "name": "valuation-techno",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": ["apps/api", "apps/web"],
+  "scripts": {
+    "dev": "node apps/api/src/index.js",
+    "build": "npm run build --workspace=apps/web",
+    "prestart": "npm run build",
+    "start": "node apps/api/src/index.js",
+    "test": "npm run test --workspace=apps/api"
+  }
+}
