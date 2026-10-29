@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS ledger(id TEXT PRIMARY KEY, jobId TEXT, type TEXT NOT
 CREATE TABLE IF NOT EXISTS notifications(id TEXT PRIMARY KEY, userId TEXT, title TEXT NOT NULL, body TEXT, channel TEXT NOT NULL DEFAULT 'PUSH', isRead INTEGER NOT NULL DEFAULT 0, createdAt TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS audit_log(id TEXT PRIMARY KEY, jobId TEXT, actorId TEXT, action TEXT NOT NULL, detail TEXT, createdAt TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS bank_feedback(id TEXT PRIMARY KEY, jobId TEXT UNIQUE NOT NULL, bankId TEXT NOT NULL, scoresJson TEXT NOT NULL, avgScore REAL NOT NULL, comment TEXT, createdAt TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS loan_decisions(id TEXT PRIMARY KEY, jobId TEXT NOT NULL, bankId TEXT NOT NULL, decision TEXT NOT NULL CHECK(decision IN ('APPROVED','DECLINED')), note TEXT, decidedAt TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_loan_decisions_job_time ON loan_decisions(jobId, decidedAt DESC);
 CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY, jobId TEXT NOT NULL, senderId TEXT NOT NULL, senderName TEXT, senderRole TEXT, body TEXT NOT NULL, createdAt TEXT NOT NULL);
 `);
 // Live inspector location columns (added without breaking existing databases)
@@ -50,6 +52,28 @@ export function addLedger({ jobId = null, type, fromParty, toParty, userId = nul
   return id;
 }
 export function seed() {
+  if (config.isProduction) {
+    // Never create demo users/jobs in production. A real database may optionally
+    // bootstrap one administrator from private hosting environment variables.
+    if (db.prepare("SELECT id FROM users WHERE role='ADMIN' LIMIT 1").get()) return;
+    const email = process.env.BOOTSTRAP_ADMIN_EMAIL?.trim();
+    const password = process.env.BOOTSTRAP_ADMIN_PASSWORD;
+    if (!email && !password) {
+      console.warn('Production mode: demo seeding is disabled; no bootstrap administrator was configured.');
+      return;
+    }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !password || password.length < 16) {
+      throw new Error('Set a valid BOOTSTRAP_ADMIN_EMAIL and a BOOTSTRAP_ADMIN_PASSWORD of at least 16 characters in the hosting secret settings.');
+    }
+    if (db.prepare('SELECT id FROM users WHERE email=?').get(email)) {
+      throw new Error('BOOTSTRAP_ADMIN_EMAIL already belongs to a non-admin user. Use a different administrator email.');
+    }
+    const id = uid();
+    db.prepare('INSERT INTO users(id,role,name,email,passwordHash,createdAt) VALUES(?,?,?,?,?,?)')
+      .run(id, 'ADMIN', process.env.BOOTSTRAP_ADMIN_NAME?.trim() || 'Platform Admin', email, bcrypt.hashSync(password, 12), now());
+    console.info(`Production bootstrap administrator created for ${email}. Remove the bootstrap password from the host settings after confirming login.`);
+    return;
+  }
   if (db.prepare('SELECT COUNT(*) c FROM users').get().c > 0) return;
   const hash = (p) => bcrypt.hashSync(p, 8); const t = now();
   const users = [
@@ -75,8 +99,8 @@ export function seed() {
   seedDemoData(ids);
 }
 
-// Rich demo data so every dashboard, chart and queue looks alive on first login.
-// 12 jobs across all statuses, spread over the last 14 days, with full money/audit trails.
+// Rich local-preview data so every dashboard, chart and queue is testable on first login.
+// This function is called only outside production mode; production keeps its own records.
 function seedDemoData(ids) {
   const FEE = 2500, COMM = 500, MARGIN = 2000, PAY = 1200, BONUS = 500;
   const r2 = (n) => Math.round(n * 100) / 100;

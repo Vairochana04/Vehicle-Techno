@@ -43,7 +43,7 @@ r.get('/analytics', wrap(async (req, res) => {
       (SELECT ROUND(AVG(f.avgScore),2) FROM bank_feedback f JOIN jobs fj ON fj.id=f.jobId WHERE fj.bankId=u.id) avgFeedback
       FROM users u LEFT JOIN jobs j ON j.bankId=u.id LEFT JOIN ledger l ON l.jobId=j.id WHERE u.role='BANK' GROUP BY u.id ORDER BY jobs DESC`).all(),
     volumeForecastNextMonth: monthly.length ? Math.max(1, Math.round(monthly.at(-1).n * 1.12)) : 1,
-    insight: avgVariance > 5 ? 'Variance is trending high — consider inspector calibration / retraining for repeated RED flags.' : 'Valuation variance is healthy (≤5% band). Green-flag auto-approval is working as designed.',
+    insight: avgVariance > 5 ? 'Average valuation variance is above 5% — review repeated RED valuation flags and inspector calibration. This is a valuation signal, not a loan decision.' : 'Average variance is within the configured 5% valuation band. This is a valuation signal only; the Bank makes the final loan decision.',
   });
 }));
 export default r;

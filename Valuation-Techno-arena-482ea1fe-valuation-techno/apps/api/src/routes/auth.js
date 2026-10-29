@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { db, publicUser, audit } from '../db.js';
 import { uid, now } from '../utils.js';
+import { config } from '../config.js';
 import { sign, requireAuth, wrap, setTokenCookie } from '../middleware/auth.js';
 const r = Router();
 const creds = z.object({ email: z.string().email(), password: z.string().min(6) });
@@ -29,6 +30,7 @@ r.post('/login', wrap(async (req, res) => {
   const tok = sign(user); setTokenCookie(req, res, tok); res.json({ token: tok, user: publicUser(user) });
 }));
 r.post('/otp/request', wrap(async (req, res) => {
+  if (config.isProduction) return res.status(503).json({ error: 'Live SMS/OTP delivery is not configured; no OTP was sent.' });
   const { phone } = z.object({ phone: z.string().min(10) }).parse(req.body);
   const code = String(100000 + Math.floor(Math.random() * 900000));
   db.prepare('INSERT INTO otp_codes VALUES(?,?,?) ON CONFLICT(phone) DO UPDATE SET code=excluded.code, expiresAt=excluded.expiresAt').run(phone, code, new Date(Date.now() + 5 * 60000).toISOString());

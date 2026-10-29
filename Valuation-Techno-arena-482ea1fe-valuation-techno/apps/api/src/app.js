@@ -17,16 +17,37 @@ import verifyRoutes from './routes/verify.js';
 seed();
 const app = express();
 app.use((req, res, next) => { res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('X-Frame-Options', 'SAMEORIGIN'); res.setHeader('Referrer-Policy', 'no-referrer'); next(); });
-app.use(cors({ origin: process.env.CORS_ORIGIN || true })); app.use(express.json({ limit: '5mb' }));
-app.use('/uploads', express.static(config.uploadDir));
-app.get('/api/health', (req, res) => res.json({ ok: true, service: 'Valuation Techno API', time: new Date().toISOString() }));
+const corsOrigin = config.isProduction ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim()).filter(Boolean) : (process.env.CORS_ORIGIN || true);
+app.use(cors({ origin: corsOrigin, credentials: true })); app.use(express.json({ limit: '5mb' }));
+app.get('/api/health', (req, res) => res.json({ ok: true, service: 'Valuation Techno API', mode: config.isProduction ? 'production' : 'preview', time: new Date().toISOString() }));
 app.use('/api/auth', authRoutes); app.use('/api/jobs', jobRoutes); app.use('/api/admin', adminRoutes); app.use('/api/verify', verifyRoutes); app.use('/api', analyticsRoutes);
 // Mobile App Layer: file upload with geo/time metadata + content hash for killfake duplicate checks
-const upload = multer({ dest: config.uploadDir, limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: config.uploadDir,
+    filename: (req, file, cb) => {
+      const originalExt = path.extname(file.originalname || '').toLowerCase();
+      const ext = /^\.[a-z0-9]{1,8}$/.test(originalExt) ? originalExt : '';
+      cb(null, `${crypto.randomUUID()}${ext}`);
+    },
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf' || file.mimetype?.startsWith('image/')) return cb(null, true);
+    const error = new Error('Only image or PDF files are allowed.'); error.status = 415; cb(error);
+  },
+});
 app.post('/api/upload', requireAuth, requireRole('INSPECTOR', 'BANK'), upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file uploaded (field name: file)' });
+  const rejectUpload = (message) => { fs.rmSync(req.file.path, { force: true }); return res.status(400).json({ error: message }); };
+  const coordinate = (value) => value === undefined || value === '' ? undefined : Number.isFinite(Number(value)) ? Number(value) : null;
+  const lat = coordinate(req.body.lat); const lng = coordinate(req.body.lng);
+  if (lat === null || lng === null || (lat === undefined) !== (lng === undefined)) return rejectUpload('Provide both valid GPS coordinates, or leave both blank.');
+  if (lat !== undefined && (lat < -90 || lat > 90 || lng < -180 || lng > 180)) return rejectUpload('GPS coordinates are outside the valid range.');
+  const capturedAt = req.body.capturedAt ? new Date(req.body.capturedAt) : new Date();
+  if (!Number.isFinite(capturedAt.getTime())) return rejectUpload('The photo timestamp is invalid.');
   const hash = crypto.createHash('sha256').update(fs.readFileSync(req.file.path)).digest('hex');
-  res.status(201).json({ filename: req.file.filename, originalName: req.file.originalname, url: `/uploads/${req.file.filename}`, imageHash: hash, category: req.body.category || 'DAMAGE', lat: req.body.lat ? Number(req.body.lat) : undefined, lng: req.body.lng ? Number(req.body.lng) : undefined, capturedAt: req.body.capturedAt || new Date().toISOString() });
+  res.status(201).json({ filename: req.file.filename, originalName: req.file.originalname, imageHash: hash, category: req.body.category || 'DAMAGE', lat, lng, capturedAt: capturedAt.toISOString() });
 });
 // Serve built frontend when present (single-port demo). `npm start` auto-builds it via prestart.
 const webDist = fileURLToPath(new URL('../../web/dist/', import.meta.url));

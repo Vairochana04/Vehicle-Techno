@@ -26,7 +26,7 @@ export function FraudGauge({ score = 0, risk = 'LOW' }) {
     <circle cx="60" cy="60" r="52" fill="none" stroke="#1e2d49" strokeWidth="10" />
     <circle cx="60" cy="60" r="52" fill="none" stroke={color} strokeWidth="10" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={circ - (animated / 100) * circ} transform="rotate(-90 60 60)" style={{ transition: 'stroke-dashoffset .3s' }} />
     <text x="60" y="58" textAnchor="middle" fontSize="24" fontWeight="800" fill={color}>{Math.round(animated)}</text><text x="60" y="76" textAnchor="middle" fontSize="10" fill="#8fa3bf">fraud / 100 · {risk}</text></svg>
-    <div className="muted">killfake.ai deepfake & tamper score</div></div>;
+    <div className="muted">Demo rule-based score · live Killfake service not connected</div></div>;
 }
 
 const HOTSPOTS = { FRONT: [100, 18], REAR: [100, 182], LEFT: [28, 100], RIGHT: [172, 100], ENGINE: [100, 48], TIRE: [40, 165], ODOMETER: [100, 82], DAMAGE: [140, 120], TOP: [100, 100], INTERIOR: [100, 105] };
@@ -43,7 +43,7 @@ export function AiScanPanel({ analysis }) {
   const items = analysis?.damage?.detections || []; const [active, setActive] = useState(0);
   useEffect(() => { if (!items.length) return; const id = setInterval(() => setActive((a) => (a + 1) % items.length), 1200); return () => clearInterval(id); }, [items.length]);
   if (!analysis) return null;
-  return <div className="scanbox"><div className="scanline" /><b>🤖 AI Vision Scan</b> · YOLOv8-SIM + Mask R-CNN-SIM · Tire wear {analysis.damage.tireWearPct}%
+  return <div className="scanbox"><div className="scanline" /><b>Damage estimate</b> · simulated provider · Tire wear {analysis.damage.tireWearPct}%
     {items.map((d, i) => <div key={i} className={i === active ? 'scan-active' : 'muted'}>{i === active ? '▣' : '·'} {d.part} — {d.type} ({d.severity}) · {Math.round(d.confidence * 100)}% confidence · {inr(d.estimatedCost)}</div>)}
     {items.length === 0 && <div className="muted">No damage detected — vehicle scanned clean.</div>}</div>;
 }
@@ -51,10 +51,10 @@ export function AiScanPanel({ analysis }) {
 export function MarketChart({ make, model }) {
   const [data, setData] = useState(null);
   useEffect(() => { api(`/market?make=${encodeURIComponent(make || 'Hyundai')}&model=${encodeURIComponent(model || 'Creta')}`).then(setData).catch(() => {}); }, [make, model]);
-  if (!data) return <p className="muted">Loading DeepSearch market intelligence…</p>;
+  if (!data) return <p className="muted">Loading market estimate…</p>;
   const all = [...data.trend, ...data.forecast]; const max = Math.max(...all.map((x) => x.value)) * 1.05; const min = Math.min(...all.map((x) => x.value)) * 0.95;
   const pt = (arr, off = 0) => arr.map((d, i) => `${((i + off) / (all.length - 1)) * 560 + 20},${130 - ((d.value - min) / (max - min)) * 110}`).join(' ');
-  return <div><h3>📈 DeepSearch Live Market — {data.make} {data.model}</h3>
+  return <div><h3>📈 Market estimate (simulated) — {data.make} {data.model}</h3>
     <svg width="100%" viewBox="0 0 600 150"><polyline className="chartline" fill="none" stroke="#38bdf8" strokeWidth="2.5" points={pt(data.trend)} /><polyline fill="none" stroke="#f59e0b" strokeWidth="2.5" strokeDasharray="6 4" points={pt(data.forecast, data.trend.length - 1)} />
       {all.map((d, i) => <text key={i} x={(i / (all.length - 1)) * 560 + 14} y="145" fontSize="8" fill="#8fa3bf">{d.month}</text>)}</svg>
     <p>Current market {inr(data.current)} · AI forecast {data.forecastChangePct >= 0 ? '▲' : '▼'} {Math.abs(data.forecastChangePct)}% / 3 mo · Comparables: {data.comparables.map((c) => `${c.city} ${inr(c.price)}`).join(' · ')}</p></div>;
@@ -259,11 +259,11 @@ export function AnalyticsPanel() {
   const fraud = a.fraud || { low: 0, medium: 0, high: 0, avgScore: 0 }; const leaderboard = a.leaderboard || [];
   const bar = (label, n, max, color) => <div key={label}><label>{label}: {n}</label><div style={{ background: '#1e2d49', borderRadius: 8, height: 12 }}><div style={{ width: `${max ? (n / max) * 100 : 0}%`, background: color, height: 12, borderRadius: 8, transition: 'width 1s' }} /></div></div>;
   const fmax = Math.max(1, fraud.low, fraud.medium, fraud.high);
-  return <div><div className="grid"><div className="card"><div className="muted">Total jobs</div><div className="stat">{Math.round(jobs)}</div></div><div className="card"><div className="muted">Settled value</div><div className="stat">{inr(settled)}</div></div><div className="card"><div className="muted">Green-flag rate</div><div className="stat">{a.greenPct}%</div></div><div className="card"><div className="muted">Avg variance</div><div className="stat">{a.avgVariance}%</div></div><div className="card"><div className="muted">Users online (live)</div><div className="stat">{a.onlineUsers}</div></div></div>
-    <div className="card"><h3>🛡️ Fraud Risk Distribution (avg score {fraud.avgScore}/100)</h3>{bar('LOW', fraud.low, fmax, '#16a34a')}{bar('MEDIUM', fraud.medium, fmax, '#f59e0b')}{bar('HIGH', fraud.high, fmax, '#dc2626')}<p className="ok">🤖 AI Insight: {a.insight} Next-month volume forecast: ~{a.volumeForecastNextMonth} jobs.</p></div>
+  return <div><div className="grid"><div className="card"><div className="muted">Total jobs</div><div className="stat">{Math.round(jobs)}</div></div><div className="card"><div className="muted">Portal ledger amount recorded</div><div className="stat">{inr(settled)}</div></div><div className="card"><div className="muted">Green-flag rate</div><div className="stat">{a.greenPct}%</div></div><div className="card"><div className="muted">Avg variance</div><div className="stat">{a.avgVariance}%</div></div><div className="card"><div className="muted">Users online (live)</div><div className="stat">{a.onlineUsers}</div></div></div>
+    <div className="card"><h3>🛡️ Fraud Risk Distribution (avg score {fraud.avgScore}/100)</h3>{bar('LOW', fraud.low, fmax, '#16a34a')}{bar('MEDIUM', fraud.medium, fmax, '#f59e0b')}{bar('HIGH', fraud.high, fmax, '#dc2626')}<p className="ok">Portfolio insight: {a.insight} Next-month volume forecast: ~{a.volumeForecastNextMonth} jobs.</p></div>
     {(a.series || []).length > 0 && <div className="card"><h3>📊 Activity — Last 14 Days</h3>
       <p className="muted">Jobs created per day</p><div className="series-chart">{a.series.map((d) => <div className="series-col" key={d.date}><span className="series-num">{d.jobs || ''}</span><div className="series-bar jobs-bar" style={{ height: `${Math.max(4, (d.jobs / Math.max(1, ...a.series.map((x) => x.jobs))) * 84)}px` }} title={`${d.label}: ${d.jobs} jobs`} /><small>{d.label.split(' ')[0]}</small></div>)}</div>
-      <p className="muted">Settlement revenue per day</p><div className="series-chart">{a.series.map((d) => <div className="series-col" key={d.date}><span className="series-num">{d.revenue ? '₹' + Math.round(d.revenue / 1000) + 'k' : ''}</span><div className="series-bar rev-bar" style={{ height: `${Math.max(4, (d.revenue / Math.max(1, ...a.series.map((x) => x.revenue))) * 84)}px` }} title={`${d.label}: ${inr(d.revenue)}`} /><small>{d.label.split(' ')[0]}</small></div>)}</div></div>}
+      <p className="muted">Portal ledger amount recorded per day</p><div className="series-chart">{a.series.map((d) => <div className="series-col" key={d.date}><span className="series-num">{d.revenue ? '₹' + Math.round(d.revenue / 1000) + 'k' : ''}</span><div className="series-bar rev-bar" style={{ height: `${Math.max(4, (d.revenue / Math.max(1, ...a.series.map((x) => x.revenue))) * 84)}px` }} title={`${d.label}: ${inr(d.revenue)}`} /><small>{d.label.split(' ')[0]}</small></div>)}</div></div>}
     {(a.banks || []).length > 0 && <div className="card"><h3>🏦 Bank-wise Performance</h3><table><thead><tr><th>Bank</th><th>Jobs</th><th>Settled Value</th><th>Avg Feedback</th></tr></thead><tbody>{a.banks.map((b) => <tr key={b.id}><td>{b.bankName}</td><td>{b.jobs}</td><td>{inr(b.settledValue)}</td><td>{b.avgFeedback ? `★ ${b.avgFeedback}` : '—'}</td></tr>)}</tbody></table></div>}
     <div className="card"><h3>🏆 Inspector Leaderboard</h3><table><thead><tr><th>Inspector</th><th>Rating</th><th>Rated jobs</th><th>Status</th></tr></thead><tbody>{leaderboard.map((u) => <tr key={u.id}><td>{u.name}</td><td>★ {u.rating}</td><td>{u.ratingCount}</td><td>{u.status}</td></tr>)}</tbody></table>{leaderboard.length === 0 && <p className="muted">No inspectors yet.</p>}</div></div>;
 }

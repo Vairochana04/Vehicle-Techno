@@ -1,4 +1,12 @@
 import { seededInt, round2, clamp, haversineKm } from '../utils.js';
+import { config } from '../config.js';
+
+function refuseProductionSimulation(provider) {
+  if (!config.isProduction) return;
+  const error = new Error(`${provider} live integration is not configured. This production request was not simulated.`);
+  error.status = 503;
+  throw error;
+}
 
 /* Provider interfaces — deterministic simulators behind real contracts.
    Swap each function with live vendor calls (VAHAN/IIB/DeepSearch/killfake/Razorpay)
@@ -6,6 +14,7 @@ import { seededInt, round2, clamp, haversineKm } from '../utils.js';
 
 const REG_RE = /^[A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{4}$/;
 export function verifyVehicle({ regNumber, expectedOdometer }) {
+  refuseProductionSimulation('Vehicle registry / insurance checks');
   const reg = String(regNumber || '').toUpperCase().replace(/\s/g, '');
   if (!REG_RE.test(reg)) return { verified: false, provider: 'VAHAN-SIM', regNumber: reg, checks: [{ name: 'RC Format', status: 'FAIL', detail: 'Invalid Indian registration format (e.g. TN38AB1234)' }], rc: null, insurance: null, ownership: null, history: null };
   const h = seededInt(reg, 1000);
@@ -27,6 +36,7 @@ export function verifyVehicle({ regNumber, expectedOdometer }) {
 
 const CATALOG = { 'maruti suzuki|swift': 899000, 'maruti suzuki|baleno': 935000, 'hyundai|creta': 1738000, 'hyundai|i20': 1050000, 'tata|nexon': 1460000, 'tata|punch': 1010000, 'mahindra|xuv700': 2645000, 'mahindra|scorpio-n': 2414000, 'toyota|innova crysta': 2663000, 'honda|city': 1592000, 'kia|seltos': 1885000 };
 export function deepSearchMarketValue(job) {
+  refuseProductionSimulation('Market valuation');
   const key = `${String(job.make).toLowerCase().trim()}|${String(job.model).toLowerCase().trim()}`;
   const newPrice = CATALOG[key] || 1100000;
   const age = clamp(new Date().getFullYear() - Number(job.year), 0, 20);
@@ -41,6 +51,7 @@ export function deepSearchMarketValue(job) {
 const COST = { dent: { Small: 2500, Medium: 6000, Large: 12000 }, scratch: { Small: 1800, Medium: 3500, Large: 6000 }, rust: { Small: 4000, Medium: 8000, Large: 15000 }, crack: { Small: 3000, Medium: 7000, Large: 14000 }, tire: { Small: 2000, Medium: 4500, Large: 9000 } };
 const PARTS_BY_CATEGORY = { FRONT: 'Front bumper/panel', REAR: 'Rear bumper/panel', LEFT: 'Left door/panel', RIGHT: 'Right door/panel', ENGINE: 'Engine bay component', TIRE: 'Tyre', ODOMETER: 'Cluster', DAMAGE: 'Damaged panel', TOP: 'Roof/panel', INTERIOR: 'Interior trim' };
 export function analyzeDamage(job, inspection) {
+  refuseProductionSimulation('AI damage analysis');
   const images = inspection.images || []; const manual = inspection.damages || [];
   const detections = [];
   images.forEach((img, i) => {
@@ -58,6 +69,7 @@ export function analyzeDamage(job, inspection) {
 }
 
 export function analyzeFraud(job, inspection) {
+  refuseProductionSimulation('Fraud analysis');
   const images = inspection.images || []; const checks = []; let score = 0;
   const seen = new Set(); let dup = false, gpsBad = 0, timeBad = 0, metaMissing = 0;
   const nowMs = Date.now();

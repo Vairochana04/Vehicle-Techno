@@ -56,6 +56,7 @@ r.get('/audit-log', requireRole('ADMIN'), wrap(async (req, res) => res.json(db.p
 r.get('/ledger', requireAuth, wrap(async (req, res) => {
   if (req.user.role === 'INSPECTOR') return res.json(db.prepare('SELECT * FROM ledger WHERE userId=? ORDER BY createdAt DESC').all(req.user.id));
   if (req.user.role === 'LOAN_SEEKER') return res.status(403).json({ error: 'Ledger not available for loan seekers' });
+  if (req.user.role === 'BANK') return res.json(db.prepare('SELECT l.* FROM ledger l JOIN jobs j ON j.id=l.jobId WHERE j.bankId=? ORDER BY l.createdAt DESC LIMIT 300').all(req.user.id));
   res.json(db.prepare('SELECT * FROM ledger ORDER BY createdAt DESC LIMIT 300').all());
 }));
 r.get('/notifications', requireAuth, wrap(async (req, res) => res.json(db.prepare('SELECT * FROM notifications WHERE userId=? OR userId IS NULL ORDER BY createdAt DESC LIMIT 50').all(req.user.id))));
