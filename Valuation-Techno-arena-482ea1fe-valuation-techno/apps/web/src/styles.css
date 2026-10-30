@@ -43,6 +43,26 @@ input,select,textarea{background:#08111f!important;color:#e7eefb!important;borde
 .login{box-shadow:0 24px 60px rgba(2,6,23,.45)}details{color:var(--ink)}summary{color:#f4f8ff}hr{border-color:var(--line)}::selection{background:rgba(56,189,248,.35)}
 .scanbox{background:linear-gradient(180deg,#0d1b2e,#08111f);border:1px solid #1e2d49;color:#dbeafe}
 
+/* ===== Login page only — distinct aurora gradient colour (dashboards keep Admin navy) ===== */
+.login-page{max-width:none;width:100%;min-height:100vh;margin:0;padding:40px 20px 64px;display:flex;justify-content:center;align-items:flex-start;position:relative;overflow:hidden;background:radial-gradient(circle at 16% 14%,rgba(217,70,239,.38),transparent 34%),radial-gradient(circle at 86% 10%,rgba(45,212,191,.32),transparent 34%),radial-gradient(circle at 80% 90%,rgba(56,189,248,.30),transparent 38%),linear-gradient(135deg,#2e1065 0%,#6d28d9 38%,#2563eb 72%,#0f766e 100%)}
+.login-page:before,.login-page:after{content:"";position:absolute;border-radius:50%;filter:blur(70px);opacity:.55;pointer-events:none}
+.login-page:before{width:340px;height:340px;left:-90px;bottom:-110px;background:#d946ef}
+.login-page:after{width:300px;height:300px;right:-70px;top:-80px;background:#2dd4bf}
+.login-page .card.login{position:relative;z-index:1;max-width:460px;width:100%;margin:48px auto;background:linear-gradient(180deg,rgba(255,255,255,.15),rgba(255,255,255,.07));border:1px solid rgba(255,255,255,.30);border-radius:24px;padding:28px;color:#fff;box-shadow:0 30px 80px rgba(46,16,101,.48);backdrop-filter:blur(16px)}
+.login-page .card.login h1{background:linear-gradient(90deg,#ffffff,#a5f3fc,#f0abfc);-webkit-background-clip:text;background-clip:text;color:transparent;font-size:31px;line-height:1.15;margin:0 0 10px}
+.login-page .muted{color:rgba(255,255,255,.80)}.login-page label{color:#fff}.login-page a{color:#a5f3fc}
+.login-page .tabs button{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.28);box-shadow:none}
+.login-page .tabs button.on{background:linear-gradient(135deg,#d946ef,#06b6d4);color:#fff;border-color:transparent}
+.login-page input,.login-page select,.login-page textarea{background:rgba(15,23,42,.55)!important;border:1px solid rgba(255,255,255,.32)!important;color:#fff!important}
+.login-page input::placeholder,.login-page textarea::placeholder{color:rgba(255,255,255,.55)}
+.login-page input:focus,.login-page select:focus,.login-page textarea:focus{outline:2px solid rgba(240,171,252,.55);border-color:#f0abfc!important}
+.login-page button{background:linear-gradient(135deg,#c026d3,#7c3aed 45%,#06b6d4);border:1px solid rgba(255,255,255,.25);color:#fff;box-shadow:0 12px 26px rgba(124,58,237,.35)}
+.login-page button.ghost{background:rgba(255,255,255,.10);color:#fff;border:1px solid rgba(255,255,255,.30);box-shadow:none;text-align:left}
+.login-page button:hover{filter:brightness(1.12)}
+.login-page .err{background:rgba(127,29,29,.38);color:#fecdd3;border-color:rgba(254,205,211,.45)}
+.login-page .ok{background:rgba(6,78,59,.38);color:#a7f3d0;border-color:rgba(167,243,208,.45)}
+@media(max-width:560px){.login-page{padding:22px 12px 40px}.login-page .card.login{margin:22px auto;padding:22px}}
+
 /* ===== Wow Pack: car showcase, valuation duel, page transitions, scroll-reveal ===== */
 .wrap{animation:pageIn .55s ease both}@keyframes pageIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 .adm-center{animation:pageIn .55s ease both}
@@ -205,6 +225,7 @@ select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,#7
   .adm-donut{width:132px;height:132px}
   .adm-sidebar nav button{padding:10px}
   .adm-filter-row{grid-template-columns:1fr}
+  .login-page .card.login{border-radius:20px}
   .car-svg{max-width:270px}
 }
 @media(max-width:360px){
@@ -291,77 +312,45 @@ details summary{color:#fff}
 .adm-filter-row input,.adm-filter-row select{background:rgba(13,6,28,.85)!important;border-color:#372a63!important;color:#f4f1ff!important}
 .adm-analytics .card{background:rgba(15,7,32,.95)!important;border-color:rgba(167,139,250,.26)!important}
 .adm-analytics .muted{color:var(--adm-muted)!important}
-/* Conventional, responsive sign-in page. These styles are intentionally scoped to login. */
-.login-page{display:block;position:relative;overflow:visible;width:100%;max-width:none;min-height:100vh;animation:none;margin:0;padding:22px clamp(16px,4vw,52px) 28px;background:#f3f6fa;color:#1b2a3d;}
-.login-page:before,.login-page:after{display:none}
-.login-page .reveal{opacity:1;transform:none;transition:none}
-.login-page ::selection{background:rgba(37,99,166,.2)}
-.login-header{max-width:1160px;margin:0 auto 34px;padding:2px 0 18px;display:flex;align-items:center;justify-content:space-between;gap:18px;border-bottom:1px solid #dce4ed}
-.login-brand{display:flex;align-items:center;gap:12px;color:#172a41}
-.login-brand-mark{width:42px;height:42px;border-radius:9px;display:grid;place-items:center;background:#123b63;color:#fff;font-size:14px;font-weight:800;letter-spacing:.03em}
-.login-brand-copy{display:grid;gap:2px}
-.login-brand-copy b{font-size:16px;line-height:1.25}
-.login-brand-copy small{color:#68798d;font-size:12px}
-.login-header-note{display:flex;align-items:center;gap:9px;color:#586a7e;font-size:13px;font-weight:600}
-.login-header-dot{width:8px;height:8px;border-radius:50%;background:#24815d}
-.login-main{max-width:1160px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(330px,.85fr);align-items:start;gap:58px}
-.login-intro{padding:28px 0 0;min-width:0}
-.login-eyebrow{margin:0 0 10px;color:#2563a6;font-size:11px;font-weight:800;letter-spacing:.12em}
-.login-intro-copy h1{margin:0;color:#172a41;font-size:clamp(36px,4vw,50px);line-height:1.1;letter-spacing:-.035em}
-.login-intro-copy h1 span{color:#2465a5}
-.login-lead{max-width:520px;margin:15px 0 0;color:#596b80;font-size:16px;line-height:1.6}
-.login-workspaces{margin-top:38px}
-.login-workspaces-heading{margin-bottom:13px}
-.login-workspaces-heading h2{margin:0;color:#20344b;font-size:19px}
-.login-workspaces-heading .muted{margin:5px 0 0;color:#65768a}
-.login-role-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-.login-role-card{min-width:0;min-height:154px;display:flex;flex-direction:column;align-items:stretch;padding:15px;background:#fff;border:1px solid #dce4ed;border-radius:10px;box-shadow:0 3px 10px rgba(20,44,70,.035)}
-.login-role-heading{display:flex;align-items:center;gap:10px}
-.login-role-heading h3{margin:0;color:#1e3249;font-size:14px;font-weight:750}
-.login-role-icon{width:32px;height:32px;flex:none;display:grid;place-items:center;border-radius:8px;background:#eaf2fa;color:#174c7d;font-size:13px;font-weight:800}
-.login-role-inspector{background:#eaf4f3;color:#17695d}
-.login-role-loan_seeker{background:#eef3fb;color:#315b92}
-.login-role-admin{background:#f0f2f5;color:#49596c}
-.login-role-card>p{margin:10px 0 13px;color:#617286;font-size:12px;line-height:1.5}
-.login-role-card>span{width:100%;margin-top:auto}
-.login-demo-note{margin:11px 0 0;color:#65768a;font-size:11px}
-.login-page .card.login.login-auth-card{position:relative;z-index:auto;max-width:none;width:100%;margin:0;padding:30px;background:#fff;color:#20344b;border:1px solid #dce4ed;border-radius:12px;box-shadow:0 8px 24px rgba(17,40,65,.08);backdrop-filter:none}
-.login-page .card.login.login-auth-card:hover{border-color:#ccd9e6;box-shadow:0 8px 24px rgba(17,40,65,.08)}
-.login-auth-heading{margin-bottom:21px}
-.login-auth-heading .login-eyebrow{margin-bottom:8px}
-.login-auth-heading h2{margin:0;color:#1b2f46;font-size:24px;line-height:1.25}
-.login-page .card.login.login-auth-card h2:after{display:none}
-.login-auth-heading .muted{margin:7px 0 0;color:#65768a}
-.login-page .login-auth-card .tabs{display:flex;gap:6px;padding:4px;margin:0 0 21px;background:#f2f5f8;border:1px solid #e0e6ed;border-radius:9px}
-.login-page .login-auth-card .tabs button{flex:1;padding:9px 8px;background:transparent!important;color:#5c6c7f!important;border:1px solid transparent!important;border-radius:6px;box-shadow:none!important;font-size:13px}
-.login-page .login-auth-card .tabs button.on{background:#fff!important;color:#174f83!important;border-color:#dce4ed!important;box-shadow:0 1px 3px rgba(17,40,65,.08)!important}
-.login-fields{display:flex;flex-direction:column;align-items:stretch}
-.login-page .login-fields label{display:block;margin:0 0 2px;color:#334960;font-size:13px;font-weight:650}
-.login-page .login-fields input,.login-page .login-fields select{margin:5px 0 16px;padding:11px 12px;background:#fff!important;color:#1b2a3d!important;border:1px solid #cbd6e2!important;border-radius:8px;box-shadow:none!important}
-.login-page .login-fields input::placeholder{color:#97a4b3}
-.login-page .login-fields input:focus,.login-page .login-fields select:focus{outline:3px solid rgba(37,99,166,.15);border-color:#397ab5!important}
-.login-page button{background:#2465a5!important;color:#fff!important;border:1px solid #2465a5!important;box-shadow:none!important;transition:background-color .15s ease,border-color .15s ease}
-.login-page button:hover{filter:none;background:#194f84!important;border-color:#194f84!important}
-.login-page .login-auth-card .login-submit-button{width:100%;margin-top:3px;padding:11px 14px;border-radius:8px}
-.login-page .login-role-card .login-role-demo-button,.login-page .login-secondary-button.ghost{width:100%;padding:8px 10px;background:#f1f6fb!important;color:#205886!important;border:1px solid #cbd9e7!important;border-radius:7px;box-shadow:none!important;font-size:12px;text-align:center!important}
-.login-page .login-role-card .login-role-demo-button:hover,.login-page .login-secondary-button.ghost:hover{background:#e7f0f8!important;border-color:#b5cadd!important}
-.login-page .login-role-card>span>span,.login-page .login-auth-card .login-fields>span>span{color:#a12828!important}
-.login-page .login-auth-card .err{background:#fff2f1;color:#9f3028;border-color:#f1c8c5}
-.login-page .login-auth-card .ok{background:#eef8f2;color:#256444;border-color:#c7e7d3}
-.login-page .login-auth-card .muted{color:#65768a}
-.login-footer{max-width:1160px;margin:32px auto 0;padding-top:15px;border-top:1px solid #dce4ed;color:#637488;font-size:12px}
-.login-footer span{padding:0 5px;color:#98a5b3}
-@media(max-width:900px){.login-main{gap:32px}.login-intro{padding-top:12px}}
-@media(max-width:760px){.login-header{margin-bottom:21px}.login-main{grid-template-columns:1fr;gap:24px}.login-auth-card{order:-1}.login-intro{padding:0}.login-workspaces{margin-top:26px}.login-footer{margin-top:24px}}
-@media(max-width:560px){.login-page{padding:17px 14px 24px}.login-header{align-items:flex-start}.login-header-note{font-size:11px;padding-top:6px}.login-brand-mark{width:38px;height:38px}.login-role-grid{grid-template-columns:1fr}.login-role-card{min-height:0}.login-page .card.login.login-auth-card{padding:22px 18px}.login-intro-copy h1{font-size:36px}}
-@media(max-width:380px){.login-header-note{max-width:92px;text-align:right;line-height:1.35}.login-page .login-auth-card .tabs button{font-size:12px;padding-inline:5px}}
+/* Login page in matching Royal Aurora (kept distinct from dashboards) */
+.login-page{background:radial-gradient(circle at 16% 14%,rgba(217,70,239,.34),transparent 34%),radial-gradient(circle at 86% 10%,rgba(233,195,124,.26),transparent 32%),radial-gradient(circle at 82% 92%,rgba(99,102,241,.36),transparent 40%),linear-gradient(135deg,#1b0640 0%,#4c1d95 42%,#312e81 74%,#1e1b4b 100%)}
+.login-page:before{background:#7c3aed}
+.login-page:after{background:#c99645;opacity:.4}
+.login-page .card.login h1{background:linear-gradient(90deg,#ffffff,#ddd6fe,#e9c37c);-webkit-background-clip:text;background-clip:text;color:transparent}
+.login-page .tabs button.on{background:linear-gradient(135deg,#7c3aed,#c99645);color:#fff}
+.login-page button{background:linear-gradient(135deg,#7c3aed,#4f46e5 55%,#312e81);border:1px solid rgba(233,195,124,.45);box-shadow:0 14px 30px rgba(76,29,149,.45)}
+.login-page button.ghost{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.30);box-shadow:none}
 
-/* Optional CarShowcase component styles; not used on the sign-in page. */
+/* Real car photo on login (replaces cartoon car) */
 .car-photo-frame{position:relative;display:inline-block;max-width:400px;width:100%;animation:carFloat 6s ease-in-out infinite}
 .car-photo{display:block;width:100%;height:auto;border-radius:18px;border:1px solid rgba(233,195,124,.45);box-shadow:0 22px 50px rgba(5,2,16,.6),0 0 42px rgba(124,58,237,.35)}
 .car-scan-chip{position:absolute;top:10px;right:10px;display:inline-flex;align-items:center;gap:7px;background:rgba(13,6,28,.72);backdrop-filter:blur(8px);color:#f2d492;border:1px solid rgba(233,195,124,.55);border-radius:99px;padding:5px 11px;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
 .car-scan-chip .live-dot{background:#e9c37c;box-shadow:0 0 0 4px rgba(233,195,124,.2)}
 @media(max-width:560px){.car-photo-frame{max-width:320px}}
+
+/* ===== Premium splash screen (logo + real car + loading bar) ===== */
+.splash{position:fixed;inset:0;z-index:2000;display:grid;place-items:center;overflow:hidden;background:radial-gradient(circle at 82% -6%,rgba(124,58,237,.5),transparent 42%),radial-gradient(circle at 10% 108%,rgba(201,150,69,.28),transparent 40%),linear-gradient(160deg,#1b0640 0%,#150833 48%,#0d0518 100%);opacity:1;visibility:visible;transition:opacity .6s ease,visibility .6s ease;cursor:pointer}
+.splash-leave{opacity:0;visibility:hidden;pointer-events:none}
+.splash-glow{position:absolute;border-radius:50%;filter:blur(70px);pointer-events:none}
+.splash-glow-a{width:340px;height:340px;right:-80px;top:-90px;background:rgba(124,58,237,.55)}
+.splash-glow-b{width:280px;height:280px;left:-70px;bottom:-80px;background:rgba(201,150,69,.4)}
+.splash-inner{position:relative;text-align:center;padding:26px 22px;width:100%;max-width:540px;animation:splashRise .7s cubic-bezier(.2,.9,.3,1) both}
+@keyframes splashRise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+.splash-logo{width:78px;height:78px;margin:0 auto 14px;border-radius:23px;display:grid;place-items:center;background:linear-gradient(135deg,#e9c37c,#7c3aed 58%,#4f46e5);font-size:27px;font-weight:900;letter-spacing:.04em;color:#fff;box-shadow:0 20px 44px rgba(124,58,237,.55),inset 0 1px 0 rgba(255,255,255,.55);animation:splashPulse 2.1s ease-in-out infinite}
+@keyframes splashPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.055)}}
+.splash-title{margin:0;font-size:34px;line-height:1.12;color:#fff;font-weight:900;letter-spacing:.01em}
+.splash-title span{background:linear-gradient(90deg,#ddd6fe,#a78bfa,#e9c37c);-webkit-background-clip:text;background-clip:text;color:transparent}
+.splash-tag{margin:7px 0 4px;color:#c9c1ef;font-size:13.5px;letter-spacing:.02em}
+.splash-car-frame{margin:16px auto 18px;max-width:430px;animation:splashDrive 1.5s cubic-bezier(.16,.84,.3,1) both}
+@keyframes splashDrive{from{opacity:0;transform:translateX(70px) scale(.96)}60%{opacity:1}to{opacity:1;transform:none}}
+.splash-car{display:block;width:100%;height:auto;border-radius:17px;border:1px solid rgba(233,195,124,.55);box-shadow:0 26px 54px rgba(3,1,10,.65),0 0 46px rgba(124,58,237,.4)}
+.splash-bar{height:6px;border-radius:99px;background:rgba(167,139,250,.25);overflow:hidden;max-width:430px;margin:0 auto;text-align:left}
+.splash-bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#7c3aed,#a78bfa,#e9c37c);box-shadow:0 0 14px rgba(233,195,124,.65);transition:width .12s linear}
+.splash-meta{display:flex;justify-content:space-between;max-width:430px;margin:9px auto 0;color:#aaa1d4;font-size:12px}
+.splash-meta b{color:#f2d492;font-size:13px}
+.splash-skip{margin:16px 0 0;color:rgba(201,193,239,.55);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+@media(max-width:560px){.splash-title{font-size:27px}.splash-logo{width:66px;height:66px;font-size:23px;border-radius:19px}.splash-car-frame{max-width:330px}}
+@media (prefers-reduced-motion: reduce){.splash-inner,.splash-car-frame,.splash-logo{animation:none}}
 
 /* Per-model car photos in job lists & details */
 .car-thumb{width:66px;height:44px;object-fit:cover;border-radius:9px;border:1px solid rgba(233,195,124,.4);box-shadow:0 6px 16px rgba(3,1,10,.45);flex:none;background:#150833}

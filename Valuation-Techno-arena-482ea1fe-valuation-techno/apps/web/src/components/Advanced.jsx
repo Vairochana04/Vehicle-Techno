@@ -145,10 +145,10 @@ export function LiveMap({ job }) {
 export function CarShowcase() {
   return <div className="car-showcase">
     <div className="car-photo-frame">
-      <img src="/real-car.jpg" alt="Premium car - AI vehicle valuation" className="car-photo" />
-      <span className="car-scan-chip"><span className="live-dot" /> AI Scan Active</span>
+      <img src="/real-car.jpg" alt="Vehicle valuation preview" className="car-photo" />
+      <span className="car-scan-chip"><span className="live-dot" /> Portal Preview</span>
     </div>
-    <div className="car-showcase-label">AI Vehicle Scan · Live Preview</div>
+    <div className="car-showcase-label">Vehicle Valuation · Preview</div>
   </div>;
 }
 

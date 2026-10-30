@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { api, token, sessionUser, setSession, clearSession, inr, fmtDate, openAuthed, blobUrl, logoutApi } from './api.js';
 import { carPhotoFor } from './carPhotos.js';
 import AiMotion from './components/AiMotion.jsx';
-import { FraudGauge, CarTwin, AiScanPanel, MarketChart, LiveMap, AnalyticsPanel, ErrorBoundary, ValuationDuel, CelebrationHost, SuccessTick, fireCelebration, ChatBox } from './components/Advanced.jsx';
+import { FraudGauge, CarTwin, AiScanPanel, MarketChart, LiveMap, AnalyticsPanel, ErrorBoundary, CarShowcase, ValuationDuel, CelebrationHost, SuccessTick, fireCelebration, ChatBox } from './components/Advanced.jsx';
 import AdminControlCenter from './components/AdminDashboard.jsx';
 import './components/BankDashboard.css';
 import './components/InspectorEvidence.css';
@@ -92,106 +92,24 @@ export function Btn({ action, children, className = '', green, danger, ghost }) 
 }
 
 function Login() {
-  const nav = useNavigate();
-  const [form, setForm] = useState({ email: '', password: '' });
-  const [reg, setReg] = useState({ name: '', email: '', password: '', phone: '', role: 'LOAN_SEEKER' });
-  const [msg, setMsg] = useState(() => { const n = sessionStorage.getItem('vt_notice'); sessionStorage.removeItem('vt_notice'); return n || ''; });
-  const [mode, setMode] = useState('login');
+  const nav = useNavigate(); const [form, setForm] = useState({ email: '', password: '' }); const [reg, setReg] = useState({ name: '', email: '', password: '', phone: '', role: 'LOAN_SEEKER' });
+  const [err, setErr] = useState(''); const [msg, setMsg] = useState(() => { const n = sessionStorage.getItem('vt_notice'); sessionStorage.removeItem('vt_notice'); return n || ''; }); const [mode, setMode] = useState('login'); const [otp, setOtp] = useState(null);
   const showDemoLogins = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEMO_LOGINS === 'true';
-  const roleCards = [
-    { key: 'BANK', title: 'Bank', initial: 'B', description: 'Create valuation jobs, review reports, and record portal fee status.' },
-    { key: 'INSPECTOR', title: 'Inspector', initial: 'I', description: 'Accept assigned jobs, complete vehicle inspections, and submit findings.' },
-    { key: 'LOAN_SEEKER', title: 'Loan Seeker', initial: 'L', description: 'Follow valuation progress, view your summary, and rate the inspector.' },
-    { key: 'ADMIN', title: 'Platform Admin', initial: 'A', description: 'Review audit cases and manage platform access and settings.' },
-  ];
-  const demoCredentials = showDemoLogins ? {
-    BANK: ['bank@valuation.techno', 'Bank@123'],
-    INSPECTOR: ['inspector@valuation.techno', 'Inspector@123'],
-    LOAN_SEEKER: ['seeker@valuation.techno', 'Seeker@123'],
-    ADMIN: ['admin@valuation.techno', 'Admin@123'],
-  } : {};
-  const doLogin = async (email, password) => {
-    const d = await api('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
-    setSession(d.token, d.user);
-    nav('/dashboard');
-  };
-
-  return <main className="wrap login-page">
-    <header className="login-header">
-      <div className="login-brand">
-        <span className="login-brand-mark" aria-hidden="true">VT</span>
-        <span className="login-brand-copy"><b>Valuation Techno</b><small>Vehicle Valuation Portal</small></span>
-      </div>
-      <div className="login-header-note"><span className="login-header-dot" />Role-based portal access</div>
-    </header>
-
-    <div className="login-main">
-      <section className="login-intro" aria-labelledby="login-title">
-        <div className="login-intro-copy">
-          <p className="login-eyebrow">VEHICLE VALUATION PORTAL</p>
-          <h1 id="login-title">Welcome to<br /><span>Valuation Techno</span></h1>
-          <p className="login-lead">Sign in to continue to the vehicle valuation workspace for your role.</p>
-        </div>
-
-        <div className="login-workspaces">
-          <div className="login-workspaces-heading">
-            <div><h2>Choose your workspace</h2><p className="muted">Each role has a dedicated dashboard.</p></div>
-          </div>
-          <div className="login-role-grid">
-            {roleCards.map((role) => <article className="login-role-card" key={role.key}>
-              <div className="login-role-heading">
-                <span className={`login-role-icon login-role-${role.key.toLowerCase()}`} aria-hidden="true">{role.initial}</span>
-                <h3>{role.title}</h3>
-              </div>
-              <p>{role.description}</p>
-              {showDemoLogins && <Btn className="login-role-demo-button" ghost action={() => doLogin(...demoCredentials[role.key])}>Open {role.title} demo</Btn>}
-            </article>)}
-          </div>
-          {showDemoLogins && <p className="login-demo-note">Demo access is enabled in this development preview.</p>}
-        </div>
-      </section>
-
-      <section className="card login login-auth-card" aria-label="Account access">
-        {msg && <div className="ok" role="status">{msg}</div>}
-        <div className="login-auth-heading">
-          <p className="login-eyebrow">ACCOUNT ACCESS</p>
-          <h2>{mode === 'register' ? 'Create an account' : mode === 'otp' ? 'Sign in with OTP' : 'Welcome back'}</h2>
-          <p className="muted">Use your registered account to continue.</p>
-        </div>
-        <div className="tabs" role="group" aria-label="Sign-in options">
-          <button type="button" aria-pressed={mode === 'login'} className={mode === 'login' ? 'on' : ''} onClick={() => setMode('login')}>Login</button>
-          <button type="button" aria-pressed={mode === 'register'} className={mode === 'register' ? 'on' : ''} onClick={() => setMode('register')}>Register</button>
-          {showDemoLogins && <button type="button" aria-pressed={mode === 'otp'} className={mode === 'otp' ? 'on' : ''} onClick={() => setMode('otp')}>OTP Login</button>}
-        </div>
-
-        {mode === 'login' && <div className="login-fields">
-          <label htmlFor="login-email">Email address</label>
-          <input id="login-email" type="email" autoComplete="username" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="you@company.com" />
-          <label htmlFor="login-password">Password</label>
-          <input id="login-password" type="password" autoComplete="current-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-          <Btn className="login-submit-button" action={() => doLogin(form.email, form.password)}>Sign in</Btn>
-        </div>}
-
-        {mode === 'register' && <div className="login-fields">
-          <label htmlFor="register-name">Full name</label><input id="register-name" autoComplete="name" value={reg.name} onChange={(e) => setReg({ ...reg, name: e.target.value })} />
-          <label htmlFor="register-email">Email address</label><input id="register-email" type="email" autoComplete="email" value={reg.email} onChange={(e) => setReg({ ...reg, email: e.target.value })} />
-          <label htmlFor="register-phone">Phone</label><input id="register-phone" type="tel" autoComplete="tel" value={reg.phone} onChange={(e) => setReg({ ...reg, phone: e.target.value })} placeholder="+91..." />
-          <label htmlFor="register-role">Role</label><select id="register-role" value={reg.role} onChange={(e) => setReg({ ...reg, role: e.target.value })}>{showDemoLogins && <><option value="BANK">Bank</option><option value="INSPECTOR">Inspector</option></>}<option value="LOAN_SEEKER">Loan Seeker</option></select>
-          <label htmlFor="register-password">Password (min 6 chars)</label><input id="register-password" type="password" autoComplete="new-password" value={reg.password} onChange={(e) => setReg({ ...reg, password: e.target.value })} />
-          <Btn className="login-submit-button" action={async () => { const d = await api('/auth/register', { method: 'POST', body: JSON.stringify(reg) }); setSession(d.token, d.user); nav('/dashboard'); }}>Create account</Btn>
-        </div>}
-
-        {mode === 'otp' && showDemoLogins && <div className="login-fields">
-          <label htmlFor="otp-phone">Phone number (demo: +919000000003 for Inspector Ravi)</label><input id="otp-phone" type="tel" autoComplete="tel" placeholder="+919000000003" />
-          <Btn className="login-secondary-button" ghost action={async () => { const d = await api('/auth/otp/request', { method: 'POST', body: JSON.stringify({ phone: document.getElementById('otp-phone').value }) }); setMsg(`OTP sent to your phone${d.demoOtp ? ` (demo OTP: ${d.demoOtp})` : ''}`); }}>Send OTP</Btn>
-          <label htmlFor="otp-code">OTP</label><input id="otp-code" inputMode="numeric" autoComplete="one-time-code" placeholder="6-digit OTP" />
-          <Btn className="login-submit-button" action={async () => { const d = await api('/auth/otp/verify', { method: 'POST', body: JSON.stringify({ phone: document.getElementById('otp-phone').value, code: document.getElementById('otp-code').value }) }); setSession(d.token, d.user); nav('/dashboard'); }}>Verify and sign in</Btn>
-        </div>}
-      </section>
-    </div>
-
-    <footer className="login-footer">Valuation Techno <span>·</span> Bank · Inspector · Loan Seeker · Platform Admin</footer>
-  </main>;
+  const doLogin = async (email, password) => { const d = await api('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }); setSession(d.token, d.user); nav('/dashboard'); };
+  const demos = showDemoLogins ? [['🏦 Bank', 'bank@valuation.techno', 'Bank@123', 'Creates jobs, reviews reports & records portal fee status'], ['🔍 Inspector Ravi ★4.6', 'inspector@valuation.techno', 'Inspector@123', 'Accepts inspection jobs & submits evidence'], ['🚗 Loan Seeker', 'seeker@valuation.techno', 'Seeker@123', 'Views valuation summary & rates inspector'], ['🛡️ Platform Admin', 'admin@valuation.techno', 'Admin@123', 'Reviews audit flags & manages platform controls']] : [];
+  return <div className="wrap login-page"><div className="card login"><h1>Valuation Techno</h1><p className="muted">Smart Valuation. Safer Transactions — vehicle valuation portal for Bank, Inspector, Loan Seeker & Platform Admin. <b>Each login opens a different dashboard.</b></p><CarShowcase />
+    {err && <div className="err">{err}</div>}{msg && <div className="ok">{msg}</div>}
+    <div className="tabs"><button className={mode === 'login' ? 'on' : ''} onClick={() => setMode('login')}>Login</button><button className={mode === 'register' ? 'on' : ''} onClick={() => setMode('register')}>Register</button>{showDemoLogins && <button className={mode === 'otp' ? 'on' : ''} onClick={() => setMode('otp')}>OTP Login</button>}</div>
+    {mode === 'login' && <><label>Email</label><input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="you@bank.com" /><label>Password</label><input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+      <Btn action={() => doLogin(form.email, form.password)}>Login →</Btn>
+      {showDemoLogins && <><p className="muted">One-click demo logins (each is a different dashboard):</p><div className="demo">{demos.map(([l, e, p, desc]) => <Btn key={e} ghost action={() => doLogin(e, p)}>{l} — {desc}</Btn>)}</div></>}</>}
+    {mode === 'register' && <><label>Full name</label><input value={reg.name} onChange={(e) => setReg({ ...reg, name: e.target.value })} /><label>Email</label><input value={reg.email} onChange={(e) => setReg({ ...reg, email: e.target.value })} /><label>Phone</label><input value={reg.phone} onChange={(e) => setReg({ ...reg, phone: e.target.value })} placeholder="+91..." /><label>Role</label><select value={reg.role} onChange={(e) => setReg({ ...reg, role: e.target.value })}>{showDemoLogins && <><option value="BANK">Bank</option><option value="INSPECTOR">Inspector</option></>}<option value="LOAN_SEEKER">Loan Seeker</option></select><label>Password (min 6 chars)</label><input type="password" value={reg.password} onChange={(e) => setReg({ ...reg, password: e.target.value })} />
+      <Btn action={async () => { const d = await api('/auth/register', { method: 'POST', body: JSON.stringify(reg) }); setSession(d.token, d.user); nav('/dashboard'); }}>Create account →</Btn></>}
+    {mode === 'otp' && showDemoLogins && <><label>Phone (demo: +919000000003 = Inspector Ravi)</label><input id="otp-phone" placeholder="+919000000003" />
+      <Btn ghost action={async () => { const d = await api('/auth/otp/request', { method: 'POST', body: JSON.stringify({ phone: document.getElementById('otp-phone').value }) }); setOtp(d.demoOtp); setMsg(`OTP sent to your phone${d.demoOtp ? ` (demo OTP: ${d.demoOtp})` : ''}`); }}>Send OTP</Btn>
+      <label>OTP</label><input id="otp-code" placeholder="6-digit OTP" />
+      <Btn action={async () => { const d = await api('/auth/otp/verify', { method: 'POST', body: JSON.stringify({ phone: document.getElementById('otp-phone').value, code: document.getElementById('otp-code').value }) }); setSession(d.token, d.user); nav('/dashboard'); }}>Verify & Login →</Btn></>}
+  </div></div>;
 }
 const INSPECTOR_CONDITION_AREAS = [['engine', 'Engine'], ['body', 'Body / exterior'], ['tires', 'Tyres'], ['interior', 'Interior']];
 const INSPECTOR_DAMAGE_TYPES = [['dent', 'Dent'], ['scratch', 'Scratch'], ['rust', 'Rust'], ['crack', 'Crack'], ['tire', 'Tyre damage']];
@@ -662,6 +580,35 @@ function VerifyPage() {
     <p><a href="/">← Open Valuation Techno</a></p></div></div>;
 }
 
+function SplashScreen() {
+  const [pct, setPct] = useState(0);
+  const [leaving, setLeaving] = useState(false);
+  const [gone, setGone] = useState(false);
+  const timers = useRef([]);
+  useEffect(() => {
+    const t0 = Date.now();
+    const iv = setInterval(() => setPct(Math.min(100, Math.round((Date.now() - t0) / 16))), 30);
+    const later = (fn, ms) => { const id = setTimeout(fn, ms); timers.current.push(id); };
+    later(() => { clearInterval(iv); setPct(100); }, 1650);
+    later(() => setLeaving(true), 1950);
+    later(() => setGone(true), 2600);
+    return () => { clearInterval(iv); timers.current.forEach(clearTimeout); };
+  }, []);
+  const skip = () => { setLeaving(true); timers.current.push(setTimeout(() => setGone(true), 380)); };
+  if (gone) return null;
+  return <div className={`splash${leaving ? ' splash-leave' : ''}`} onClick={skip} role="status" aria-label="Loading Valuation Techno">
+    <span className="splash-glow splash-glow-a" /><span className="splash-glow splash-glow-b" />
+    <div className="splash-inner">
+      <div className="splash-logo">VT</div>
+      <h1 className="splash-title">Valuation <span>Techno</span></h1>
+      <p className="splash-tag">Smart Valuation. Safer Transactions.</p>
+      <div className="splash-car-frame"><img src="/real-car.jpg" alt="Premium valuation car" className="splash-car" /></div>
+      <div className="splash-bar"><i style={{ width: `${pct}%` }} /></div>
+      <div className="splash-meta"><span>Loading the valuation portal…</span><b>{pct}%</b></div>
+      <p className="splash-skip">Tap anywhere to skip</p>
+    </div>
+  </div>;
+}
 export default function App() {
   useEffect(() => { // scroll-reveal: cards rise in as they enter the screen
     const io = new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('revealed'); io.unobserve(e.target); } }), { threshold: 0.06 });
@@ -670,4 +617,4 @@ export default function App() {
     const fallback = setTimeout(() => document.querySelectorAll('.reveal').forEach((el) => el.classList.add('revealed')), 2500);
     return () => { io.disconnect(); mo.disconnect(); clearTimeout(fallback); };
   }, []);
-  return <><CelebrationHost /><Routes><Route path="/" element={token() ? <Navigate to="/dashboard" /> : <Login />} /><Route path="/dashboard" element={<Dashboard />} /><Route path="*" element={<Navigate to="/" />} /></Routes></>; }
+  return <><SplashScreen /><CelebrationHost /><Routes><Route path="/" element={token() ? <Navigate to="/dashboard" /> : <Login />} /><Route path="/dashboard" element={<Dashboard />} /><Route path="*" element={<Navigate to="/" />} /></Routes></>; }
